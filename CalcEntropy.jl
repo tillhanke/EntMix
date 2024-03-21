@@ -9,7 +9,7 @@ argparser = ArgParseSettings()
 @add_arg_table! argparser begin
     "--radial_factor", "-f"
         help="Factor to multiply the VdW radii of the atoms (default .6)"
-        default=1
+        default=1.
         arg_type=Float64
     "--maxstep", "-m"
         help="Maximum number of steps to use"

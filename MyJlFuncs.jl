@@ -1,6 +1,6 @@
 using LinearAlgebra
 
-function parse_traj(path)
+function parse_traj(path; frames=maxtype(Int))
     println("loading ", path)
     io = open(path, "r")
     raw = read(io, String)
@@ -8,14 +8,21 @@ function parse_traj(path)
     println("I am loaded")
     offset = 0
     fsize = length(raw)
-    frameid = 1
+    frameid = 0
     list_of_frames = []
     while offset < fsize
-        println("Parsing frame ", frameid)
-        println("current Offset: ", offset)
-        offset, framedata = parse_xyz_string(raw[offset+1:end]; offset=true)
+        # println("Parsing frame ", frameid)
+        # println("current Offset: ", offset)
+
+        additionaloffset, framedata = parse_xyz_string(raw[offset+1:end]; offset=true)
+        frameid += 1
+        offset += additionaloffset
         push!(list_of_frames, framedata)
+        if frameid == frames
+            break
+        end
     end
+    println("Read through $frameid frames")
     return list_of_frames
 end
 
@@ -30,8 +37,8 @@ function parse_xyz(path)
 end
 
 function parse_xyz_string(inp; offset=false)
-    amount_atoms = parse(Int, match(r"[0-9]*", inp).match)
-    println("Amount of atoms: ", amount_atoms)
+    amount_atoms = parse(Int, match(r"( *)?([0-9]*)", inp)[2])
+    # println("Amount of atoms: ", amount_atoms)
     off = match(r"\n", inp).offset +1
     off = match(r"\n", inp, off).offset +1
     atom_coords = zeros(amount_atoms,3)

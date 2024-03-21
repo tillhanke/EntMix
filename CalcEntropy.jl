@@ -12,8 +12,8 @@ argparser = ArgParseSettings()
         default=1.
         arg_type=Float64
     "--maxstep", "-m"
-        help="Maximum number of steps to use"
-        default=typemax(Int)
+        help="Maximum number of steps to use (default 0, means all steps)"
+        default=0
         arg_type=Int
     "--startstep", "-s"
         help="Initial step to use"
@@ -52,8 +52,8 @@ radii = Dict(
 )
 println("Scaled VdW radii: ", radii)
 
-# Function to use for smearing. Available options are: slater, gauss, rect
-smearing = gauss
+# Function to use for smearing. Available options are: slater, gaus, rect
+smearing = gaus
 # --------------------------
 # END INPUT
 # --------------------------
@@ -87,12 +87,15 @@ end
 
 # Load files
 
-traj_data = parse_traj(file, frames=maxstep) 
+traj_data = parse_traj(file, frames=maxstep)  # maxstep == 0 means all frames
 if length(traj_data) != 1
     println("Found $(length(traj_data)) frames in the file.")
 end
 println("Step\tEntropy:")
-for (i, frame) in enumerate(traj_data[startstep:maxstep])
+for (i, frame) in enumerate(traj_data[startstep:end])  # end because parse_traj takes care of cutting the end with maxstep
+    println("Step: ", i)
+    println("Atoms t1: ", frame[1][1:n_atoms])
+    println("Atoms t2: ", frame[1][n_atoms:end])
     mol1_sig = [radii[el] for el in frame[1][1:n_atoms]]
     mol2_sig = [radii[el] for el in frame[1][n_atoms+1:end]]
 

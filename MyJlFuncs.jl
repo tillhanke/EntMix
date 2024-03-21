@@ -1,6 +1,6 @@
 using LinearAlgebra
 
-function parse_traj(path; frames=2^60)
+function parse_traj(path; frames=0)  # frames == 0 will never be reached so this means all steps
     println("loading ", path)
     io = open(path, "r")
     raw = read(io, String)
@@ -41,7 +41,7 @@ function parse_xyz_string(inp; offset=false)
     atom_coords = zeros(amount_atoms,3)
     elements = Array{String}(undef, amount_atoms)
     for at_ind in 1:amount_atoms
-        el, x, y, z = (match(r"([^ ]*) *(-?\d*\.\d*) *(-?\d*\.\d*) *(-?\d*\.\d*)", inp, off)[i] for i in 1:4)
+        el, x, y, z = (match(r"([^ ]*) *(-?\d*\.?\d*) *(-?\d*\.?\d*) *(-?\d*\.?\d*)", inp, off)[i] for i in 1:4)
         elements[at_ind] = string(el)
         atom_coords[at_ind, 1:3] = [parse(Float64, x), parse(Float64, y), parse(Float64, z)]
         off = match(r"\n", inp, off).offset+1

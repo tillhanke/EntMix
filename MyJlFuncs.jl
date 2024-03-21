@@ -1,6 +1,6 @@
 using LinearAlgebra
 
-function parse_traj(path; frames=maxtype(Int))
+function parse_traj(path; frames=2^60)
     println("loading ", path)
     io = open(path, "r")
     raw = read(io, String)
@@ -11,9 +11,6 @@ function parse_traj(path; frames=maxtype(Int))
     frameid = 0
     list_of_frames = []
     while offset < fsize
-        # println("Parsing frame ", frameid)
-        # println("current Offset: ", offset)
-
         additionaloffset, framedata = parse_xyz_string(raw[offset+1:end]; offset=true)
         frameid += 1
         offset += additionaloffset

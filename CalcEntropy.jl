@@ -15,6 +15,10 @@ argparser = ArgParseSettings()
         help="Maximum number of steps to use"
         default=typemax(Int)
         arg_type=Int
+    "--startstep", "-s"
+        help="Initial step to use"
+        default=1
+        arg_type=Int
     "xyzfile"
         help="xyz file to use"
         required=true
@@ -30,6 +34,7 @@ radial_factor = args["radial_factor"]
 file = args["xyzfile"]
 n_atoms = args["amatoms"]
 maxstep = args["maxstep"]
+startstep = args["startstep"]
 
 # Van der Waals radii
 # Values from: https://en.wikipedia.org/wiki/Atomic_radii_of_the_elements_(data_page)
@@ -87,7 +92,7 @@ if length(traj_data) != 1
     println("Found $(length(traj_data)) frames in the file.")
 end
 println("Step\tEntropy:")
-for (i, frame) in enumerate(traj_data)
+for (i, frame) in enumerate(traj_data[startstep:maxstep])
     mol1_sig = [radii[el] for el in frame[1][1:n_atoms]]
     mol2_sig = [radii[el] for el in frame[1][n_atoms+1:end]]
 

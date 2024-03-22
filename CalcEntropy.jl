@@ -7,8 +7,8 @@ include("MyJlFuncs.jl")
 argparser = ArgParseSettings()
 @add_arg_table! argparser begin
     "--radial_factor", "-f"
-        help="Factor to multiply the VdW radii of the atoms (default .6)"
-        default=1.
+        help="Factor to multiply the VdW radii of the atoms"
+        default=.6
         arg_type=Float64
     "--maxstep", "-m"
         help="Maximum number of steps to use (default 0, means all steps)"
@@ -18,6 +18,10 @@ argparser = ArgParseSettings()
         help="Initial step to use"
         default=1
         arg_type=Int
+    "--densfunc", "-d" 
+        help="Function to use for smearing. Available options are: slater, gaus, rect"
+        default="slater"
+        arg_type=String
     "xyzfile"
         help="xyz file to use"
         required=true
@@ -34,6 +38,16 @@ file = args["xyzfile"]
 n_atoms = args["amatoms"]
 maxstep = args["maxstep"]
 startstep = args["startstep"]
+if args["densfunc"] == "slater"
+    smearing = slater
+elseif args["densfunc"] == "gaus"
+    smearing = gaus
+elseif args["densfunc"] == "rect"
+    smearing = rect
+else
+    println("Invalid smearing function")
+    exit(1)
+end
 
 # Van der Waals radii
 # Values from: https://en.wikipedia.org/wiki/Atomic_radii_of_the_elements_(data_page)
@@ -52,7 +66,8 @@ radii = Dict(
 @debug println("Scaled VdW radii: ", radii)
 
 # Function to use for smearing. Available options are: slater, gaus, rect
-smearing = gaus
+smearing = slater
+
 # --------------------------
 # END INPUT
 # --------------------------

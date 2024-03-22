@@ -49,7 +49,7 @@ radii = Dict(
     "Cl"=>1.75*bohr*radial_factor,
     "Br"=>1.85*bohr*radial_factor,
 )
-println("Scaled VdW radii: ", radii)
+@debug println("Scaled VdW radii: ", radii)
 
 # Function to use for smearing. Available options are: slater, gaus, rect
 smearing = gaus
@@ -90,9 +90,9 @@ end
 # if length(traj_data) != 1
 #     println("Found $(length(traj_data)) frames in the file.")
 # end
+println("Using $file with $n_atoms atoms in the first molecule")
 println("Step\tEntropy:")
 if startstep != 1
-    println("Skipping to step $startstep")
     open(file, "r") do fio
         global am_at = parse(Int, readline(fio))
         seekstart(fio)

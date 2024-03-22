@@ -2,6 +2,28 @@ using LinearAlgebra
 
 function parse_traj(path; frames=0)  # frames == 0 will never be reached so this means all steps
     println("loading ", path)
+    open(path, "r") do fio
+        firstline = readline(fio)
+        amatoms = parse(Int, firstline)
+        seek(fio, 0)
+        # List of frames, each frame is a tuple of elements and atom coordinates
+        list_of_frames = Vector{Tuple{Vector{String}, Matrix{Float64}}}() 
+        frame = 0
+        raw_list = Vector{String}(undef, amatoms+2)
+        while !eof(fio)
+            for i = 1:amatoms+2
+                raw_list[i] = readline(fio)
+            end
+            elements, atom_coords = parse_xyz_list(raw_list)
+            push!(list_of_frames, (elements, atom_coords))
+            frame += 1
+            println("Frame ", frame, " loaded")
+            if frame == frames
+                break
+            end
+        end
+    end
+    return list_of_frames
     io = open(path, "r")
     raw = read(io, String)
     close(io)
@@ -33,7 +55,31 @@ function parse_xyz(path)
     return parse_xyz_string(raw)
 end
 
-function parse_xyz_string(inp; offset=false)
+function parse_xyz_line(xyzline::String)
+    pattern = r" *([^ ]*) *([^ ]*) *([^ ]*) *([^ ]*)" 
+    return match(pattern, xyzline)
+end
+
+function parse_xyz_list(xyzlist::Vector{String})
+    # Parse single xyz timestep in form of a list of strings
+    amount_atoms = parse(Int, xyzlist[1])
+    if length(xyzlist) != amount_atoms + 2
+        # raise error, because this does not work
+        println("Error: Amount of atoms does not match the amount of atoms in the file")
+        exit(1)
+    end
+
+    atom_coords = zeros(amount_atoms,3)
+    elements = Array{String}(undef, amount_atoms)
+    for (at_ind, line) in enumerate(xyzlist[3:end])
+        el, x, y, z = parse_xyz_line(line)
+        elements[at_ind] = string(el)
+        atom_coords[at_ind, 1:3] = [parse(Float64, x), parse(Float64, y), parse(Float64, z)]
+    end
+    return elements, atom_coords
+end
+
+function parse_xyz_string(inp::String; offset=false)
     amount_atoms = parse(Int, match(r"( *)?([0-9]*)", inp)[2])
     # println("Amount of atoms: ", amount_atoms)
     off = match(r"\n", inp).offset +1
@@ -41,7 +87,8 @@ function parse_xyz_string(inp; offset=false)
     atom_coords = zeros(amount_atoms,3)
     elements = Array{String}(undef, amount_atoms)
     for at_ind in 1:amount_atoms
-        el, x, y, z = (match(r"([^ ]*) *(-?\d*\.?\d*) *(-?\d*\.?\d*) *(-?\d*\.?\d*)", inp, off)[i] for i in 1:4)
+        # TODO: replace this with function call, needs to handle offset manually
+        el, x, y, z = (match(r"([^ ]*) *(-?\d*\.?\d*) *(-?\d*\.?\d*) *(-?\d*\.?\d*)", inp, off)[i] for i in 1:4) 
         elements[at_ind] = string(el)
         atom_coords[at_ind, 1:3] = [parse(Float64, x), parse(Float64, y), parse(Float64, z)]
         off = match(r"\n", inp, off).offset+1

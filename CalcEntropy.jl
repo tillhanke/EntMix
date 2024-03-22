@@ -1,4 +1,3 @@
-using Plots
 using LinearAlgebra
 using Integrals
 using ArgParse
@@ -87,15 +86,39 @@ end
 
 # Load files
 
-traj_data = parse_traj(file, frames=maxstep)  # maxstep == 0 means all frames
-if length(traj_data) != 1
-    println("Found $(length(traj_data)) frames in the file.")
-end
+# traj_data = parse_traj(file, frames=maxstep)  # maxstep == 0 means all frames
+# if length(traj_data) != 1
+#     println("Found $(length(traj_data)) frames in the file.")
+# end
 println("Step\tEntropy:")
-for (i, frame) in enumerate(traj_data[startstep:end])  # end because parse_traj takes care of cutting the end with maxstep
-    println("Step: ", i)
-    println("Atoms t1: ", frame[1][1:n_atoms])
-    println("Atoms t2: ", frame[1][n_atoms:end])
+if startstep != 1
+    println("Skipping to step $startstep")
+    open(file, "r") do fio
+        global am_at = parse(Int, readline(fio))
+        seekstart(fio)
+        for i in 1:(am_at+2)*(startstep-1)
+            readline(fio)
+        end
+        global offset = position(fio)
+    end
+else
+    open(file, "r") do fio
+        global am_at = parse(Int, readline(fio))
+    end
+    offset = 0
+end
+for step in startstep:maxstep  
+    @debug "Reading step $step"
+    open(file, "r") do fio
+        global offset
+        seek(fio, offset)
+        tslines = [readline(fio) for i in 1:am_at+2]
+        global frame = parse_xyz_list(tslines)
+        global offset = position(fio)
+        global eofio = eof(fio) 
+    end
+
+
     mol1_sig = [radii[el] for el in frame[1][1:n_atoms]]
     mol2_sig = [radii[el] for el in frame[1][n_atoms+1:end]]
 
@@ -113,6 +136,11 @@ for (i, frame) in enumerate(traj_data[startstep:end])  # end because parse_traj 
         [minmax[2][i] for i in 1:3], 
         (smearing, mol1_sig, frame[2][1:n_atoms,:], mol2_sig, frame[2][n_atoms+1:end,:])
     )
-    println(i,"\t", solve(prob, HCubatureJL();reltol=1e-1, abstol=1e-1).u/prod(minmax[2]-minmax[1]))
+    @debug "Solving"
+    println(step,"\t", solve(prob, HCubatureJL();reltol=1e-1, abstol=1e-1).u/prod(minmax[2]-minmax[1]))
+    global eofio
+    if eofio
+        break
+    end
 end
 

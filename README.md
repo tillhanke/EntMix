@@ -13,9 +13,9 @@ The two molecules are sorted within each timestep and the first 300 atoms are al
 A complete usage is provided via
 ```bash
 julia CalcEntropy.jl --help
-  > usage: CalcEntropy.jl [-f RADIAL_FACTOR] [-m MAXSTEP] [-h] xyzfile
-  >                      amatoms
-  >
+  > usage: CalcEntropy.jl [-f RADIAL_FACTOR] [-m MAXSTEP] [-s STARTSTEP]
+  >                       [-d DENSFUNC] [-h] xyzfile amatoms
+  > 
   > positional arguments:
   >   xyzfile               xyz file to use
   >   amatoms               Number of atoms in the first molecule (type:
@@ -24,10 +24,16 @@ julia CalcEntropy.jl --help
   > optional arguments:
   >   -f, --radial_factor RADIAL_FACTOR
   >                         Factor to multiply the VdW radii of the atoms
-  >                         (default .6) (type: Float64, default: 1.0)
+  >                         (type: Float64, default: 0.6)
   >   -m, --maxstep MAXSTEP
-  >                         Maximum number of steps to use (type: Int64,
-  >                         default: 9223372036854775807)
+  >                         Maximum number of steps to use (default 0,
+  >                         means all steps) (type: Int64, default: 0)
+  >   -s, --startstep STARTSTEP
+  >                         Initial step to use (type: Int64, default: 1)
+  >   -d, --densfunc DENSFUNC
+  >                         Function to use for smearing. Available
+  >                         options are: slater, gaus, rect (default:
+  >                         "slater")
   >   -h, --help            show this help message and exit
-  > 
 ```
+

@@ -11,8 +11,8 @@ argparser = ArgParseSettings()
         default=.6
         arg_type=Float64
     "--maxstep", "-m"
-        help="Maximum number of steps to use (default 0, means all steps)"
-        default=0
+        help="Maximum number of steps to use (default -1, means all steps)"
+        default=-1
         arg_type=Int
     "--startstep", "-s"
         help="Initial step to use"
@@ -122,7 +122,10 @@ else
     end
     offset = 0
 end
-for step in startstep:maxstep  
+
+step = startstep-1
+while step != maxstep 
+    step += 1
     @debug "Reading step $step"
     open(file, "r") do fio
         global offset

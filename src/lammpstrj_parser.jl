@@ -15,6 +15,7 @@ function parse_lammpstrj(filename::String; start=0, stop=Inf, ret_steps=false)
     open(filename) do file
         head = read_lammpstrj_head(file)
         firststep = head["timestep"]
+        @debug "Head contains: $(head)"
         if start == 0
             start = firststep
         end
@@ -25,13 +26,20 @@ function parse_lammpstrj(filename::String; start=0, stop=Inf, ret_steps=false)
         for l in 1:(head["n_atoms"]+9)
             readline(file)
         end
-        @debug "getting deltats"
-        head2 = read_lammpstrj_head(file)
-        # delta ts per timestep written to lammpstrj file
-        delts = head2["timestep"] - head["timestep"]
+        if !eof(file)
+            @debug "getting deltats"
+            head2 = read_lammpstrj_head(file)
+            # delta ts per timestep written to lammpstrj file
+            delts = head2["timestep"] - head["timestep"]
         # approx amount of bytes per timestep
-        ts_byte = position(file) 
-        @debug delts, ts_byte
+            ts_byte = position(file) 
+            @debug delts, ts_byte
+        else
+            @info "Only found one timestep in file"
+            delts = 1
+            ts_byte = 0
+            stop = firststep
+        end
         if stop != Inf
             @debug "Stopping at timestep $(stop)"
         else
@@ -57,13 +65,23 @@ function parse_lammpstrj(filename::String; start=0, stop=Inf, ret_steps=false)
         @debug "file position: $(position(file))"
 
         # read data
-        @debug "Reading total amount of $(stop-start÷delts) timesteps"
+        @debug "Reading total amount of $((stop-start÷delts)+1) timesteps"
         starttime = time()
         for tstep in 1:(stop-start)÷delts+1
             if tstep%1000 == 0
                 @debug "Reading $(tstep)th at time: $(time() - starttime)"
             end
             head = read_lammpstrj_head!(file)
+            if !("x" in keys(head["columns"]) )
+                if "xu" in keys(head["columns"])
+                    @info "loading unwrapped coordinates"
+                    head["columns"]["x"] = head["columns"]["xu"]
+                    head["columns"]["y"] = head["columns"]["yu"]
+                    head["columns"]["z"] = head["columns"]["zu"]
+                else
+                    error("No x column found in timestep")
+                end
+            end
             xc, yc, zc = head["columns"]["x"], head["columns"]["y"], head["columns"]["z"]
             elc = head["columns"]["element"]
             for l in 1:head["n_atoms"]

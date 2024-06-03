@@ -279,29 +279,35 @@ Returns:
 - atoms: Array{Float64,2} - updated array of atom coordinates inside the box
 """
 function wrap!(atoms, box)
-    counter = 0
     for i in 1:size(atoms,1)
         for j in 1:3
-            if atoms[i,j] < box[1,j]
+            while atoms[i,j] < box[1,j]
                 atoms[i,j] += box[2,j]-box[1,j]
-                @debug counter += 1
-                if atoms[i,j] < box[1,j]
-                    error("Atom $i is still outside the box")
-                end
+                # if atoms[i,j] < box[1,j]
+                #     error("Atom $i is still outside the box")
+                # end
             end
-            if atoms[i,j] > box[2,j]
+            while atoms[i,j] > box[2,j]
                 atoms[i,j] -= box[2,j]-box[1,j]
-                @debug counter += 1
-                if atoms[i,j] > box[2,j]
-                    error("Atom $i is still outside the box")
-                end
+                # if atoms[i,j] > box[2,j]
+                #     error("Atom $i is still outside the box")
+                # end
             end
         end
     end
-    @debug "Wrapped $counter atoms"
     return atoms
 end
 
+"""
+Wrap atoms into the box
+
+Args:
+- atoms: Array{Float64,2} - array of atom coordinates
+- box: Array{Float64,1} - box dimensions in the form [x_min y_min z_min; x_max y_max z_max]
+
+Returns:
+- atoms: Array{Float64,2} - updated array of atom coordinates inside the box
+"""
 function wrap(atoms, box)
     new_atoms = copy(atoms)
     return wrap!(new_atoms, box)

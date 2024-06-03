@@ -1,4 +1,4 @@
-# Mixing Entropy Calculation based on MD Trajectory
+# Entropy of Mixing Calculation based on MD Trajectory
 
 This module evaluates trajectory data from md simulations and calculates the configurational entropy distribution.
 

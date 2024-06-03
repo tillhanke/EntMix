@@ -1,0 +1,9 @@
+name = "EntMix"
+uuid = "e8613159-47f9-434c-8817-aca8562c09cd"
+authors = ["Till Hanke <till.hanke@chemie.uni-halle.de>"]
+version = "0.1.0"
+
+[deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Integrals = "de52edbc-65ea-441a-8357-d3a637375a31"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

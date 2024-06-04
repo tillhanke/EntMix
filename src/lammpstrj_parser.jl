@@ -67,6 +67,15 @@ function parse_lammpstrj(filename::String; start=0, stop=Inf, ret_steps=false)
         # read data
         @debug "Reading total amount of $((stop-start÷delts)+1) timesteps"
         starttime = time()
+        if !("x" in keys(head["columns"]) )
+            if "xu" in keys(head["columns"])
+                @info "loading unwrapped coordinates"
+            else
+                error("No x column found in timestep")
+            end
+        end
+
+
         for tstep in 1:(stop-start)÷delts+1
             if tstep%1000 == 0
                 @debug "Reading $(tstep)th at time: $(time() - starttime)"
@@ -74,12 +83,9 @@ function parse_lammpstrj(filename::String; start=0, stop=Inf, ret_steps=false)
             head = read_lammpstrj_head!(file)
             if !("x" in keys(head["columns"]) )
                 if "xu" in keys(head["columns"])
-                    @info "loading unwrapped coordinates"
                     head["columns"]["x"] = head["columns"]["xu"]
                     head["columns"]["y"] = head["columns"]["yu"]
                     head["columns"]["z"] = head["columns"]["zu"]
-                else
-                    error("No x column found in timestep")
                 end
             end
             xc, yc, zc = head["columns"]["x"], head["columns"]["y"], head["columns"]["z"]

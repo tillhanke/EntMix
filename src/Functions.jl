@@ -128,7 +128,7 @@ Args:
 Returns:
 * Float64 - entropy of mixing
 """
-function entropy(m1, m2; radial_factor, dfunc, periodic=false, box=Nothing)
+function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=Nothing)
 
     scaled_vdw = copy(VDWradii)
     map!(x->x*BOHR*radial_factor, values(scaled_vdw))

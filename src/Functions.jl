@@ -20,21 +20,26 @@ Calculate entropy distribution at point r
 
 Args:
 - r: Array{Float64,1} - point in space
+- atoms1: Array{Float64,2} - array of atom coordinates for first molecule
+- sigma1: Array{Float64,1} - array of atom broadening values for first molecule
+- atoms2: Array{Float64,2} - array of atom coordinates for second molecule
+- sigma2: Array{Float64,1} - array of atom broadening values for second molecule
+
+Optional:
 - dfunc: Function - density distribution function
    - must take 3 arguments: r, r0, sigma
    - r: Array{Float64,2} - point in space
    - r0: Array{Float64,2} - atom coordinates
    - sigma: Float64 - atom broadening value
-- atoms1: Array{Float64,2} - array of atom coordinates for first molecule
-- sigma1: Array{Float64,1} - array of atom broadening values for first molecule
-- atoms2: Array{Float64,2} - array of atom coordinates for second molecule
-- sigma2: Array{Float64,1} - array of atom broadening values for second molecule
+- na1: Int - number of atoms in the first molecule
+- na2: Int - number of atoms in the second molecule
+
 returns:
 - s: Float64 - entropy at point r
 """
-function entropy_distribution(r; dfunc=slater, atoms1=[0 0 0], sigma1=[.1], atoms2=[1 1 1], sigma2=[.1])
-    d_a = dens(r, dfunc=dfunc, sigma=sigma1, atoms=atoms1)
-    d_b = dens(r, dfunc=dfunc, sigma=sigma2, atoms=atoms2)
+function entropy_distribution(r, atoms1, sigma1, atoms2, sigma2; dfunc=slater, na1=1, na2=1)
+    d_a = dens(r, dfunc=dfunc, sigma=sigma1, atoms=atoms1)/na1
+    d_b = dens(r, dfunc=dfunc, sigma=sigma2, atoms=atoms2)/na2
     s = 0
     if d_a != 0
         xa = d_a/(d_a+d_b)
@@ -45,6 +50,13 @@ function entropy_distribution(r; dfunc=slater, atoms1=[0 0 0], sigma1=[.1], atom
         s -= xb*log(xb) 
     end
     return s
+end
+
+"""
+Integral Problem compatible
+"""
+function entropy_distribution(r; dfunc=slater, atoms1=[0 0 0], sigma1=[.1], atoms2=[1 1 1], sigma2=[.1], na1=1, na2=1)
+    return entropy_distribution(r, atoms1, sigma1, atoms2, sigma2; dfunc=slater, na1=1, na2=1)
 end
 
 """
@@ -124,11 +136,13 @@ Args:
   + sigma: Float64 - atom broadening value
 * periodic: Bool - whether to use periodic boundary conditions
 * box: Array{Float64,2} - box dimensions
+* na1: Int - number of atoms in the first molecule
+* na2: Int - number of atoms in the second molecule
 
 Returns:
 * Float64 - entropy of mixing
 """
-function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=Nothing)
+function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=Nothing, na1=1, na2=1)
 
     scaled_vdw = copy(VDWradii)
     map!(x->x*BOHR*radial_factor, values(scaled_vdw))
@@ -193,7 +207,9 @@ function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=No
             sigma1=[scaled_vdw[el] for el in m1_elems],
             atoms1=m1_coords, 
             sigma2=[scaled_vdw[el] for el in m2_elems],
-            atoms2=m2_coords
+            atoms2=m2_coords,
+            na1=na1,
+            na2=na2
         )
     )
     @debug "Solving"

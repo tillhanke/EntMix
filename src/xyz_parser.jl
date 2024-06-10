@@ -69,9 +69,6 @@ returns:
 - atom_coords: Array{Float64,3} - array of atom coordinates
 """
 function parse_xyz(file; start=1, stop=0)
-    if start == nothing
-        start = 1
-    end
     offset = find_xyz_offset(file, start)
     elements = []
     atom_coords = []

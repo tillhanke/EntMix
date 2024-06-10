@@ -21,6 +21,9 @@ function xyz_entropy(file, n_atoms, maxstep, startstep; kwargs...)
     if maxstep == nothing
         maxstep = -1  # default for xyz
     end
+    if startstep == nothing
+        startstep = 1  # default for xyz
+    end
     elements, positions = parse_xyz(file, start=startstep, stop=maxstep)
     maxstep = length(elements)
     @info "Not using periodic boundary conditions"
@@ -38,6 +41,18 @@ function xyz_entropy(file, n_atoms, maxstep, startstep; kwargs...)
     end
 end
 
+"""
+Calculate configurational Entropy of mixing for a given lammpstrj file
+Printing out all entropies for each step from startstep to maxstep or saving to a file
+
+Args:
+* file: String - path to the xyz file containing both molecules in each step
+* n_atoms: Int - number of atoms in the first molecule
+* maxstep: Int - maximum step to calculate entropy for
+* startstep: Int - step to start calculation from
+* outfile: String - path to the file to save the entropies to
+* kwargs: Dict - additional arguments for the entropy function
+"""
 function lammpstrj_entropy(file, n_atoms, maxstep=nothing, startstep=nothing; outfile=nothing, kwargs...)
     if maxstep == nothing 
         maxstep = Inf  # default for lammpstrj

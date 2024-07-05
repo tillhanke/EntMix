@@ -152,6 +152,8 @@ function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=No
         if box == Nothing
             error("Periodic boundary conditions require box dimensions")
         end
+        m1 = (wrap(m1[1], box), m1[2])
+        m2 = (wrap(m2[1], box), m2[2])
         m1_p = add_periodic(m1[1], m1[2], box; delta=2*radial_factor)
         m2_p = add_periodic(m2[1], m2[2], box; delta=2*radial_factor)
         @debug "Added periodic atoms" size(m1_p[1]), size(m2_p[1])

@@ -152,8 +152,9 @@ function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=No
         if box == Nothing
             error("Periodic boundary conditions require box dimensions")
         end
-        m1_p = add_periodic(m1[1], m1[2], box; delta=radial_factor)
-        m2_p = add_periodic(m2[1], m2[2], box; delta=radial_factor)
+        m1_p = add_periodic(m1[1], m1[2], box; delta=2*radial_factor)
+        m2_p = add_periodic(m2[1], m2[2], box; delta=2*radial_factor)
+        @debug "Added periodic atoms" size(m1_p[1]), size(m2_p[1])
         if size(m1_p[1])[1] != 0
             m1_coords = [ 
                          m1[1]
@@ -163,6 +164,9 @@ function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=No
                         m1[2]
                         m1_p[2]
                        ]
+        else
+            m1_coords = m1[1]
+            m1_elems = m1[2]
         end
         if size(m2_p[1])[1] != 0
             m2_coords = [
@@ -173,8 +177,10 @@ function entropy(m1, m2; radial_factor=0.6, dfunc=slater, periodic=false, box=No
                         m2[2]
                         m2_p[2]
                        ]
+        else
+            m2_coords = m2[1]
+            m2_elems = m2[2]
         end
-        @debug "Added periodic atoms" size(m1_p[1]), size(m2_p[1])
         
     else
         @debug "Molecule 1" m1
@@ -236,47 +242,35 @@ additional atoms and their elements
 function add_periodic(atoms, elems, box; delta=0.1)
     new_ats = []
     new_elems = []
-    basevec = box[2,:]-box[1,:]
+    basevec = box[2,:] - box[1,:]
+    
     for (element, coord) in zip(elems, eachrow(atoms))
-        negs = coord.-box[1,:] .< delta
-        pos = abs.(coord.-box[2,:]) .< delta 
-        drs = []
-        for (n, dr) in zip(negs, eachrow([1 0 0; 0 1 0; 0 0 1]))
-            if n
-                push!(drs, dr.*basevec) 
-            end
+        # find out if the atom is near the boundary
+        lb = coord    .- box[1,:] 
+        ub = box[2,:] .- coord    
+        if any(lb .< 0) | any(ub .< 0)
+            @debug "Atom $element $coord is not within the box, will be skipped"
+            continue
+            # skip all atoms that are not in the box
         end
-        for i in 1:length(drs)
-            push!(new_ats, coord+drs[i])
-            push!(new_elems, element)
-            for j in i+1:length(drs)
-                push!(new_ats, coord+drs[i]+drs[j])
-                push!(new_elems, element)
-                for k in j+1:length(drs)
-                    push!(new_ats, coord+drs[i]+drs[j]+drs[k])
-                    push!(new_elems, element)
-                end
-            end
-        end
-        drs = []
-        for (n, dr) in zip(pos, eachrow([-1 0 0; 0 -1 0; 0 0 -1]))
-            if n
-                push!(drs, dr.*basevec) 
-            end
-        end
-        for i in 1:length(drs)
-            push!(new_ats, coord+drs[i])
-            push!(new_elems, element)
-            for j in i+1:length(drs)
-                push!(new_ats, coord+drs[i]+drs[j])
-                push!(new_elems, element)
-                for k in j+1:length(drs)
-                    push!(new_ats, coord+drs[i]+drs[j]+drs[k])
+
+        # now map the correct dei to the negs and pos combinations
+        neg = (lb .< delta) * 1 # has to be mirrored in +d, because its close to the lower boundary
+        pos = (ub .< delta) * -1  # has to be mirrored in -d, because its close to the upper boundary
+        for i in pos[1]:neg[1]
+            for j in pos[2]:neg[2]
+                for k in pos[3]:neg[3]
+                    if [i j k] == [0 0 0]
+                        continue
+                    end
+                    push!(new_ats, [i, j, k] .* basevec + coord)
                     push!(new_elems, element)
                 end
             end
         end
     end
+        
+
     if length(new_ats) == 0
         return [], []
     end

@@ -63,8 +63,6 @@ function lammpstrj_entropy(file, n_atoms, maxstep=nothing, startstep=nothing; ou
     elements, positions, boxes, steps = parse_lammpstrj(file; start=startstep, stop=maxstep, ret_steps=true)
     
     starttime = time()
-    # TODO: create option to save to file
-    #   then make it using threads
     if outfile != nothing
         outarray = Array{Float64}(undef, size(elements)[1], 2)
         @info "Using $(Threads.nthreads()) threads"

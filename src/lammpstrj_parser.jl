@@ -1,4 +1,25 @@
 """
+Reads the column ids from a lammpstrj header
+#### Returns:
+- Int  column id for x
+- Int  column id for y
+- Int  column id for z
+- Int  column id for element
+"""
+function get_headcolumns(head)
+    if !("x" in keys(head["columns"]) )
+        if "xu" in keys(head["columns"])
+            head["columns"]["x"] = head["columns"]["xu"]
+            head["columns"]["y"] = head["columns"]["yu"]
+            head["columns"]["z"] = head["columns"]["zu"]
+        end
+    end
+    xc, yc, zc = head["columns"]["x"], head["columns"]["y"], head["columns"]["z"]
+    elc = head["columns"]["element"]
+    return xc, yc, zc, elc
+end
+
+"""
 Parse a lammpstrj file with elements and 3 coordinates per atom
 #### Args:
 - filename: String  path to lammpstrj file
@@ -80,6 +101,7 @@ function parse_lammpstrj(filename::String; start=0, stop=Inf, ret_steps=false)
             if tstep%1000 == 0
                 @debug "Reading $(tstep)th at time: $(time() - starttime)"
             end
+            # TODO: swap with function call
             head = read_lammpstrj_head!(file)
             if !("x" in keys(head["columns"]) )
                 if "xu" in keys(head["columns"])

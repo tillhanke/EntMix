@@ -17,6 +17,10 @@ Pkg.add("./EntMix")
 ```
 
 ## Usage
+The easiest way to use the module is to use the provided script `calc_entropy.jl`. In order to use that one has to additionally install the Package `ArgParse`:
+```julia
+Pkg.add("ArgParse")
+```
 Using the provided script allows to calculate entropy from lammpstrj or xyz files directly:
 ```bash
 julia EntMix/src/calc_entropy.jl -m 100 traj.lammpstrj 300

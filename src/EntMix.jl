@@ -1,6 +1,10 @@
 module EntMix
-include("main.jl")
+include("Entropy.jl")
 
-export entropy
+module Molecule
+include("moldetect.jl")
+end
+
+export entropy, dens, entropy_distribution, Molecule
 
 end # module EntMix

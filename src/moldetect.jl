@@ -1,4 +1,4 @@
-using Chemfiles: Frame, UnitCell, positions, covalent_radius, lengths, guess_bonds!, set_type!, name
+using Chemfiles: Frame, UnitCell, positions, covalent_radius, lengths, guess_bonds!, set_type!, name, type
 import Chemfiles
 
 """
@@ -84,7 +84,7 @@ Args:
 Returns:
 - at_to_mol: Dict{Int, Int} - dictionary of atom indices to molecule indices
 """
-function mol_dictionary(frame::Frame, molecules::Vector{Vector{Int}})
+function mol_dictionary(molecules::Vector{Vector{Int}})
     at_to_mol = Dict{Int, Int}()
     for (id, mol) in enumerate(molecules)
         for atom in mol
@@ -122,4 +122,23 @@ function mol_types(frame::Frame, molecules::Vector{Vector{Int}})
 end
 
 
-
+"""
+Function returns a Dict of SMILES that contain lists of molecules with the corresponding type.
+### Args:
+- frame: Frame - frame of trajectory containing the atoms and their positions and types
+- molecule: Vector{Int} - atom indices in Chemfiles format (starting from 0)
+### Returns
+- smiles: String - canonical SMILES representation of the molecule
+"""
+function smiles(frame::Frame, molecule::Vector{Int})
+    path, io = mktemp()
+    amats = length(molecule)
+    write(io, "$amats\n\n")
+    for atid in molecule
+        write(io, "$(type(frame[atid]))  $(positions(frame)[1, atid+1]) $(positions(frame)[2, atid+1]) $(positions(frame)[3, atid+1])\n")
+    end
+    close(io)
+    
+    smiles = split(read(`sh -c "obabel -i xyz -o can $path 2> /dev/null"`, String), "\t")[1]
+    return smiles
+end

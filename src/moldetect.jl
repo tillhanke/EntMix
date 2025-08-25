@@ -107,11 +107,7 @@ Returns:
 function mol_types(frame::Frame, molecules::Vector{Vector{Int}})
     moltypes = Dict{String, Array{Int}}()
     for (molid, mol) in enumerate(molecules)
-        molname = ""
-        for atid in mol
-            molname *= String(Chemfiles.type(frame[atid]))
-        end
-        molname = join(sort(collect(molname)))     
+        molname = smiles(frame, mol)    
         if haskey(moltypes, molname)
             push!(moltypes[molname], molid)
         else

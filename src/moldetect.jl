@@ -26,6 +26,84 @@ function type_from_name!(frame::Frame, types::Vector{String})
     end
 end
 
+function adjacent(frame::Frame)
+    adj = Vector{Vector{Int}}(undef, size(frame))
+    bonds = Chemfiles.bonds(Chemfiles.Topology(frame))
+    if isempty(bonds)
+        try
+            guess_bonds!(frame)
+            bonds = Chemfiles.bonds(Chemfiles.Topology(frame))
+        catch e
+            if contains(string(e), "missing Van der Waals radius for")
+                @warn "try setting Atom types first"
+            end
+            rethrow(e)
+        end
+    end
+
+    for bond in eachcol(bonds)
+        if !isassigned(adj, bond[1]+1)
+            adj[bond[1]+1] = Int[]
+        end
+        push!(adj[bond[1]+1], bond[2])
+        if !isassigned(adj, bond[2]+1)
+            adj[bond[2]+1] = Int[]
+        end
+        push!(adj[bond[2]+1], bond[1])
+    end
+    return adj
+end
+
+"""
+Generate a simplified SMILES code for Molecule
+### Args:
+- frame Chemfiles Frame containing information of atoms
+- mol:: Vector{Int}  Vector of atom indices (in Chemfiles format, starting at 0) within the molecule
+### Returns:
+- smiles:: String containing the Smiles code
+"""
+function smiles(frame, mol::Vector{Int})
+    smi = ""
+    visited = zeros(Bool, size(frame))
+    adj = adjacent(frame)
+    function _trav_(atid, prev) 
+        # filter neighbors by Hydrogen
+        neighbors = filter(n -> Chemfiles.type(frame[n]) != "H", adj[atid+1])
+        # remove prev atom from neighbords
+        @info neighbors
+        deleteat!(neighbors, neighbors .== prev)
+        visited[atid+1] = true
+        if length(neighbors) == 1
+            if visited[neighbors[1]+1]
+                # something with loops
+                @info "found loop"
+            else
+                return Chemfiles.type(frame[atid]) * _trav_(neighbors[1], atid)
+            end
+        elseif length(neighbors) == 0
+            # found end of molecule
+            return Chemfiles.type(frame[atid])
+        end
+        smi = Chemfiles.type(frame[atid])
+        # manage splits
+        for nb in neighbors
+            if visited[nb+1]
+                # something with loops
+                @info "found loop"
+            else
+                smi *= "(" * _trav_(nb, atid) * ")"
+            end
+        end
+        return smi
+    end
+    atid = mol[1] 
+    while Chemfiles.type(frame[atid]) == "H"
+        atid += 1
+    end
+    smi = _trav_(atid, -1)
+    return smi
+end
+
 """
 Generate list of molecules from Frame
 
@@ -36,21 +114,17 @@ Returns:
 - molecules: Vector{Vector{Int}} - list of molecules with atom indices in Chemfiles format (starting from 0)
 """
 function get_molecules(frame::Frame)
-    try
-        guess_bonds!(frame)
-    catch e
-        if contains(string(e), "missing Van der Waals radius for")
-            @warn "try setting Atom types first"
+    if isempty(Chemfiles.bonds(Chemfiles.Topology(frame)))
+        try
+            guess_bonds!(frame)
+        catch e
+            if contains(string(e), "missing Van der Waals radius for")
+                @warn "try setting Atom types first"
+            end
+            rethrow(e)
         end
-        rethrow(e)
     end
-    topo = Chemfiles.Topology(frame)
-    bonds = Array{Int}(Chemfiles.bonds(topo))
-    adjacent = [[] for _ in 1:size(frame)]
-    for bond in eachcol(bonds)
-        push!(adjacent[bond[1]+1], bond[2])
-        push!(adjacent[bond[2]+1], bond[1])
-    end
+    adj = adjacent(frame)
     visited = zeros(Bool, size(frame))
     molecules = Vector{Vector{Int}}()
     for i in 0:size(frame)-1
@@ -61,7 +135,7 @@ function get_molecules(frame::Frame)
             while !isempty(queue)
                 atom = pop!(queue)
                 push!(mol, atom)
-                for neighbor in adjacent[atom+1]
+                for neighbor in adj[atom+1]
                     if !visited[neighbor+1]
                         push!(queue, neighbor)
                         visited[neighbor+1] = true
@@ -117,24 +191,3 @@ function mol_types(frame::Frame, molecules::Vector{Vector{Int}})
     return moltypes
 end
 
-
-"""
-Function returns a Dict of SMILES that contain lists of molecules with the corresponding type.
-### Args:
-- frame: Frame - frame of trajectory containing the atoms and their positions and types
-- molecule: Vector{Int} - atom indices in Chemfiles format (starting from 0)
-### Returns
-- smiles: String - canonical SMILES representation of the molecule
-"""
-function smiles(frame::Frame, molecule::Vector{Int})
-    path, io = mktemp()
-    amats = length(molecule)
-    write(io, "$amats\n\n")
-    for atid in molecule
-        write(io, "$(type(frame[atid]))  $(positions(frame)[1, atid+1]) $(positions(frame)[2, atid+1]) $(positions(frame)[3, atid+1])\n")
-    end
-    close(io)
-    
-    smiles = split(read(`sh -c "obabel -i xyz -o can $path 2> /dev/null"`, String), "\t")[1]
-    return smiles
-end

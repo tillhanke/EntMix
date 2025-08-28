@@ -136,18 +136,29 @@ Returns:
 - smiles: String - SMILES code for the molecule containing the specified atom
 """
 function generate_smiles(frame::Frame, atom_id::Int, adjacent::Union{Vector{Vector{Int}}, Nothing}=nothing)
-    # Check if frame is empty
-    if size(frame) == 0
-        throw(ArgumentError("Frame is empty"))
-    end
-    
-    # Check if atom_id is valid
-    if atom_id < 0 || atom_id >= size(frame)
-        throw(ArgumentError("Atom ID $atom_id is out of bounds. Frame has $(size(frame)) atoms (0-$(size(frame)-1))"))
-    end
-    # Get molecules and find which one contains the atom
+    # Get molecules first to determine what atoms exist
     if adjacent === nothing
-        molecules = get_molecules(frame)
+        try
+            molecules = get_molecules(frame)
+            
+            # Check if frame is empty after molecule detection
+            if isempty(molecules)
+                throw(ArgumentError("No molecules found in frame"))
+            end
+            
+            # Check if atom_id is valid based on molecules found
+            max_atom_id = maximum(maximum(mol) for mol in molecules if !isempty(mol))
+            min_atom_id = minimum(minimum(mol) for mol in molecules if !isempty(mol))
+            
+            if atom_id < min_atom_id || atom_id > max_atom_id
+                throw(ArgumentError("Atom ID $atom_id not found. Valid atom IDs: $min_atom_id to $max_atom_id"))
+            end
+        catch e
+            # If get_molecules fails, try to work with manual frame construction
+            if adjacent === nothing
+                throw(ArgumentError("Cannot detect molecules in frame and no adjacency provided: $e"))
+            end
+        end
         # Build adjacency from detected bonds
         try
             guess_bonds!(frame)
@@ -216,12 +227,12 @@ Returns:
 - smiles_dict: Dict{String, Vector{Vector{Int}}} - dictionary mapping SMILES codes to vectors of atom ID vectors for each molecule instance
 """
 function molecule_smiles_dict(frame::Frame)
+    molecules = get_molecules(frame)
+    
     # Check if frame is empty
-    if size(frame) == 0
+    if isempty(molecules)
         return Dict{String, Vector{Vector{Int}}}()
     end
-    
-    molecules = get_molecules(frame)
     
     # Build adjacency list from bonds
     try

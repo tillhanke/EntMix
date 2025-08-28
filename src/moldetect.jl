@@ -77,6 +77,7 @@ function smiles(frame, mol::Vector{Int})
             if visited[neighbors[1]+1]
                 # something with loops
                 @info "found loop"
+                return Chemfiles.type(frame[atid]) , neighbors[1]
             else
                 return Chemfiles.type(frame[atid]) * _trav_(neighbors[1], atid)
             end
@@ -90,6 +91,7 @@ function smiles(frame, mol::Vector{Int})
             if visited[nb+1]
                 # something with loops
                 @info "found loop"
+                return Chemfiles.type(frame[atid]) , neighbors[1]
             else
                 smi *= "(" * _trav_(nb, atid) * ")"
             end

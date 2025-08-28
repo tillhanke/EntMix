@@ -63,64 +63,69 @@ Generate a simplified SMILES code for Molecule
 - smiles:: String containing the Smiles code
 """
 function smiles(frame, mol::Vector{Int})
-    smi = ""
+    smis = Chemfiles.type.(frame)
     visited = zeros(Bool, size(frame))
     adj = adjacent(frame)
-    function _trav_(atid, prev) 
-        # filter neighbors by Hydrogen
-        neighbors = filter(n -> Chemfiles.type(frame[n]) != "H", adj[atid+1])
-        # remove prev atom from neighbords
-        @info neighbors
-        deleteat!(neighbors, neighbors .== prev)
+    loop_label = Dict{Tuple{Int, Int}, String}()
+    next_loopid = 1
+    """
+    A function that searches through the tree and breaks all loops.
+    """
+    function _breakloop(atid, prev)
+        nbs = filter(n-> Chemfiles.type(frame[n]) != "H", adj[atid+1])
+        deleteat!(nbs, nbs.==prev)
         visited[atid+1] = true
-        if length(neighbors) == 1
-            if visited[neighbors[1]+1]
-                # something with loops
-                @info "found loop"
-                return Chemfiles.type(frame[atid]), neighbors[1]
-            else
-                nei_smi, loop =  _trav_(neighbors[1], atid)
-                if !isnothing(loop)
-                    if atid == loop
-                        return Chemfiles.type(frame[atid]) * "1" * nei_smi, nothing 
-                    else
-                        return Chemfiles.type(frame[atid]) * nei_smi, loop
-                    end
-                end
-                return Chemfiles.type(frame[atid]) * nei_smi, nothing
-            end
-        elseif length(neighbors) == 0
-            # found end of molecule
-            return Chemfiles.type(frame[atid]), nothing
-        end
-        smi = Chemfiles.type(frame[atid])
-        loop_other = nothing
-        # manage splits
-        for nb in neighbors
+        @info "breakloop: $atid from $prev"
+        for nb in nbs
             if visited[nb+1]
-                # something with loops
-                return Chemfiles.type(frame[atid]), nb
-                @info "found loop"
-            else
-                nei_smi, loop = _trav_(nb, atid)
-                if !isnothing(loop)
-                    if atid == loop
-                        smi = smi[1:length(Chemfiles.type(frame[atid]))] * "1" * smi[Chemfiles.type(frame[atid]):end]
+                if ! haskey(loop_label, (atid, nb))
+                    if next_loopid > 9
+                        loop_label[(atid, nb)], loop_label[(nb, atid)] = "%$next_loopid", "%$next_loopid"
                     else
-                        global loop_other = loop
+                        loop_label[(atid, nb)], loop_label[(nb, atid)] = "$next_loopid", "$next_loopid"
                     end
+                    next_loopid += 1
+                    smis[atid+1] *= loop_label[(atid, nb)]
+                    smis[nb+1] *= loop_label[(atid, nb)]
+                    @info "delete $nb from adj $atid"
+                    @info "before: $(adj[atid+1])"
+                    deleteat!(adj[atid+1], adj[atid+1] .== nb) # remove loop from adj_graph
+                    @info "after: $(adj[atid+1])"
+                    @info "delete $atid from adj $nb"
+                    @info "before: $(adj[nb+1])"
+                    deleteat!(adj[nb+1], adj[nb+1] .== atid) # remove loop from adj_graph
+                    @info "after: $(adj[nb+1])"
                 end
-                smi *= "(" * nei_smi * ")"
+            else
+                _breakloop(nb, atid)
             end
         end
-        return smi, loop_other
     end
+    function _smi(atid, prev)
+        @info "smi: $atid from $prev"
+        nbs = filter(n-> Chemfiles.type(frame[n]) != "H", adj[atid+1])
+        deleteat!(nbs, nbs .== prev)
+        nbsmis = ""
+        while length(nbs) > 1
+            nb = pop!(nbs)
+            nbsmis *= "(" * _smi(nb, atid) * ")"
+        end
+        while length(nbs) > 0 
+            nb = pop!(nbs)
+            nbsmis *= _smi(nb, atid)
+        end
+        return smis[atid+1] * nbsmis
+    end
+
+    # find starting atom
     atid = mol[1] 
+    ind = 1
     while Chemfiles.type(frame[atid]) == "H"
-        atid += 1
+        ind += 1
+        atid = mol[ind]
     end
-    smi = _trav_(atid, -1)
-    return smi
+    _breakloop(atid, -1)
+    return _smi(atid, -1)
 end
 
 """

@@ -77,24 +77,43 @@ function smiles(frame, mol::Vector{Int})
             if visited[neighbors[1]+1]
                 # something with loops
                 @info "found loop"
+                return Chemfiles.type(frame[atid]), neighbors[1]
             else
-                return Chemfiles.type(frame[atid]) * _trav_(neighbors[1], atid)
+                nei_smi, loop =  _trav_(neighbors[1], atid)
+                if !isnothing(loop)
+                    if atid == loop
+                        return Chemfiles.type(frame[atid]) * "1" * nei_smi, nothing 
+                    else
+                        return Chemfiles.type(frame[atid]) * nei_smi, loop
+                    end
+                end
+                return Chemfiles.type(frame[atid]) * nei_smi, nothing
             end
         elseif length(neighbors) == 0
             # found end of molecule
-            return Chemfiles.type(frame[atid])
+            return Chemfiles.type(frame[atid]), nothing
         end
         smi = Chemfiles.type(frame[atid])
+        loop_other = nothing
         # manage splits
         for nb in neighbors
             if visited[nb+1]
                 # something with loops
+                return Chemfiles.type(frame[atid]), nb
                 @info "found loop"
             else
-                smi *= "(" * _trav_(nb, atid) * ")"
+                nei_smi, loop = _trav_(nb, atid)
+                if !isnothing(loop)
+                    if atid == loop
+                        smi = smi[1:length(Chemfiles.type(frame[atid]))] * "1" * smi[Chemfiles.type(frame[atid]):end]
+                    else
+                        global loop_other = loop
+                    end
+                end
+                smi *= "(" * nei_smi * ")"
             end
         end
-        return smi
+        return smi, loop_other
     end
     atid = mol[1] 
     while Chemfiles.type(frame[atid]) == "H"

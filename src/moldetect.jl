@@ -11,11 +11,14 @@ type_from_name!(frame::Frame, types::Vector{String})
 Assign types based on list of atomtypes
 """
 function type_from_name!(frame::Frame; force=false)
-    if Chemfiles.type(frame[1]) != "" && !force
+    if size(frame) == 0
+        return  # Empty frame, nothing to do
+    end
+    if Chemfiles.type(frame[0]) != "" && !force
         @warn "Atom types already set, doing nothing"
         return
     end
-    for i in 0:length(frame)-1
+    for i in 0:size(frame)-1
         set_type!(view(frame, i), name(view(frame, i)))  # copy name (which is 'C', 'H', etc.) into type
     end
 end
@@ -133,6 +136,15 @@ Returns:
 - smiles: String - SMILES code for the molecule containing the specified atom
 """
 function generate_smiles(frame::Frame, atom_id::Int, adjacent::Union{Vector{Vector{Int}}, Nothing}=nothing)
+    # Check if frame is empty
+    if size(frame) == 0
+        throw(ArgumentError("Frame is empty"))
+    end
+    
+    # Check if atom_id is valid
+    if atom_id < 0 || atom_id >= size(frame)
+        throw(ArgumentError("Atom ID $atom_id is out of bounds. Frame has $(size(frame)) atoms (0-$(size(frame)-1))"))
+    end
     # Get molecules and find which one contains the atom
     if adjacent === nothing
         molecules = get_molecules(frame)
@@ -204,6 +216,11 @@ Returns:
 - smiles_dict: Dict{String, Vector{Vector{Int}}} - dictionary mapping SMILES codes to vectors of atom ID vectors for each molecule instance
 """
 function molecule_smiles_dict(frame::Frame)
+    # Check if frame is empty
+    if size(frame) == 0
+        return Dict{String, Vector{Vector{Int}}}()
+    end
+    
     molecules = get_molecules(frame)
     
     # Build adjacency list from bonds
@@ -253,9 +270,140 @@ function _generate_molecule_smiles(frame::Frame, molecule::Vector{Int}, adjacent
         return ""
     end
     
-    # For a simple implementation, we'll create a canonical molecular formula
-    # This is not a true SMILES but serves as a unique identifier for the molecule type
+    # For small molecules, try to generate a more SMILES-like representation
+    if length(molecule) <= 10
+        return _generate_simple_smiles(frame, molecule, adjacent)
+    else
+        # For larger molecules, fall back to molecular formula
+        return _generate_molecular_formula(frame, molecule)
+    end
+end
+
+"""
+Generate a simple SMILES-like representation for small molecules
+"""
+function _generate_simple_smiles(frame::Frame, molecule::Vector{Int}, adjacent::Vector{Vector{Int}})
+    # Create a subgraph for this molecule
+    atom_to_local = Dict{Int, Int}()
+    for (local_idx, atom_idx) in enumerate(molecule)
+        atom_to_local[atom_idx] = local_idx
+    end
     
+    # Build local adjacency list
+    local_adjacent = [Int[] for _ in 1:length(molecule)]
+    for (local_idx, atom_idx) in enumerate(molecule)
+        for neighbor in adjacent[atom_idx + 1]  # Convert to 1-indexed
+            if neighbor in keys(atom_to_local)
+                push!(local_adjacent[local_idx], atom_to_local[neighbor])
+            end
+        end
+    end
+    
+    # Find a good starting atom (prefer carbons, then heteroatoms, then hydrogens)
+    start_atom = _find_canonical_start_atom(frame, molecule)
+    start_local = atom_to_local[start_atom]
+    
+    # Generate SMILES using DFS traversal
+    visited = falses(length(molecule))
+    smiles_parts = String[]
+    
+    function dfs(local_idx::Int, parent::Int = -1)
+        if visited[local_idx]
+            return
+        end
+        
+        visited[local_idx] = true
+        atom_idx = molecule[local_idx]
+        atom_symbol = String(Chemfiles.type(frame[atom_idx]))
+        if atom_symbol == ""
+            atom_symbol = String(Chemfiles.name(frame[atom_idx]))
+        end
+        
+        # Count unvisited neighbors
+        unvisited_neighbors = Int[]
+        for neighbor_local in local_adjacent[local_idx]
+            if neighbor_local != parent && !visited[neighbor_local]
+                push!(unvisited_neighbors, neighbor_local)
+            end
+        end
+        
+        # Add atom symbol
+        push!(smiles_parts, atom_symbol)
+        
+        # Add branches
+        if length(unvisited_neighbors) > 1
+            for (i, neighbor) in enumerate(unvisited_neighbors)
+                if i > 1
+                    push!(smiles_parts, "(")
+                end
+                dfs(neighbor, local_idx)
+                if i > 1
+                    push!(smiles_parts, ")")
+                end
+            end
+        elseif length(unvisited_neighbors) == 1
+            dfs(unvisited_neighbors[1], local_idx)
+        end
+    end
+    
+    dfs(start_local)
+    
+    # If not all atoms visited, add remaining components
+    for local_idx in 1:length(molecule)
+        if !visited[local_idx]
+            push!(smiles_parts, ".")
+            dfs(local_idx)
+        end
+    end
+    
+    smiles = join(smiles_parts, "")
+    
+    # If the SMILES is getting too complex, fall back to molecular formula
+    if length(smiles) > 50 || count(==('.'), smiles) > 0
+        return _generate_molecular_formula(frame, molecule)
+    end
+    
+    return smiles
+end
+
+"""
+Find the most suitable starting atom for SMILES generation
+"""
+function _find_canonical_start_atom(frame::Frame, molecule::Vector{Int})
+    # Priority: C > N > O > others > H
+    priority_order = ["C", "N", "O", "S", "P", "F", "Cl", "Br", "I"]
+    
+    for symbol in priority_order
+        for atom_idx in molecule
+            atom_type = String(Chemfiles.type(frame[atom_idx]))
+            if atom_type == ""
+                atom_type = String(Chemfiles.name(frame[atom_idx]))
+            end
+            if atom_type == symbol
+                return atom_idx
+            end
+        end
+    end
+    
+    # If no priority atoms found, return first non-hydrogen
+    for atom_idx in molecule
+        atom_type = String(Chemfiles.type(frame[atom_idx]))
+        if atom_type == ""
+            atom_type = String(Chemfiles.name(frame[atom_idx]))
+        end
+        if atom_type != "H"
+            return atom_idx
+        end
+    end
+    
+    # If only hydrogens, return the first one
+    return molecule[1]
+end
+
+"""
+Generate molecular formula as fallback
+"""
+function _generate_molecular_formula(frame::Frame, molecule::Vector{Int})
     # Count atoms by type
     atom_counts = Dict{String, Int}()
     for atom_idx in molecule
@@ -269,7 +417,7 @@ function _generate_molecule_smiles(frame::Frame, molecule::Vector{Int}, adjacent
     # Sort atom types for canonical representation
     sorted_types = sort(collect(keys(atom_counts)))
     
-    # Build molecular formula string (simplified SMILES-like representation)
+    # Build molecular formula string
     formula_parts = String[]
     for atom_type in sorted_types
         count = atom_counts[atom_type]
@@ -280,8 +428,6 @@ function _generate_molecule_smiles(frame::Frame, molecule::Vector{Int}, adjacent
         end
     end
     
-    # For a more sophisticated approach, we could implement proper SMILES generation
-    # with graph traversal, but for now we use molecular formula as a unique identifier
     return join(formula_parts, "")
 end
 

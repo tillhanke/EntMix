@@ -1,7 +1,7 @@
 name = "EntMix"
 uuid = "e8613159-47f9-434c-8817-aca8562c09cd"
 authors = ["Till Hanke <till.hanke@chemie.uni-halle.de>"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 Chemfiles = "46823bd8-5fb3-5f92-9aa0-96921f3dd015"

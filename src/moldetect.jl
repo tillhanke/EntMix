@@ -1,4 +1,5 @@
 using Chemfiles: Frame, UnitCell, positions, covalent_radius, lengths, guess_bonds!, set_type!, name, type
+using StaticArrays
 import Chemfiles
 
 """
@@ -59,23 +60,30 @@ Generate a simplified SMILES code for Molecule
 ### Args:
 - frame Chemfiles Frame containing information of atoms
 - mol:: Vector{Int}  Vector of atom indices (in Chemfiles format, starting at 0) within the molecule
+#### Optional:
+- attypes:: Vector{String}  Vector with length of frame with all atomtypes
 ### Returns:
 - smiles:: String containing the Smiles code
 """
-function smiles(frame, mol::Vector{Int})
-    smis = Chemfiles.type.(frame)
+function smiles(frame, mol::Vector{Int}; startid=1, adj=nothing, attypes=nothing)
+    if attypes === nothing
+        smis = Chemfiles.type.(frame)
+    else
+        smis = attypes
+    end
     visited = zeros(Bool, size(frame))
-    adj = adjacent(frame)
+    if adj === nothing
+        adj = adjacent(frame)
+    end
     loop_label = Dict{Tuple{Int, Int}, String}()
     next_loopid = 1
     """
     A function that searches through the tree and breaks all loops.
     """
     function _breakloop(atid, prev)
-        nbs = filter(n-> Chemfiles.type(frame[n]) != "H", adj[atid+1])
-        deleteat!(nbs, nbs.==prev)
+        nbs = filter(n-> (Chemfiles.type(frame[n]) != "H") && (n !=prev), adj[atid+1])
         visited[atid+1] = true
-        @info "breakloop: $atid from $prev"
+        @debug "breakloop: $atid from $prev"
         for nb in nbs
             if visited[nb+1]
                 if ! haskey(loop_label, (atid, nb))
@@ -87,14 +95,8 @@ function smiles(frame, mol::Vector{Int})
                     next_loopid += 1
                     smis[atid+1] *= loop_label[(atid, nb)]
                     smis[nb+1] *= loop_label[(atid, nb)]
-                    @info "delete $nb from adj $atid"
-                    @info "before: $(adj[atid+1])"
                     deleteat!(adj[atid+1], adj[atid+1] .== nb) # remove loop from adj_graph
-                    @info "after: $(adj[atid+1])"
-                    @info "delete $atid from adj $nb"
-                    @info "before: $(adj[nb+1])"
                     deleteat!(adj[nb+1], adj[nb+1] .== atid) # remove loop from adj_graph
-                    @info "after: $(adj[nb+1])"
                 end
             else
                 _breakloop(nb, atid)
@@ -102,7 +104,7 @@ function smiles(frame, mol::Vector{Int})
         end
     end
     function _smi(atid, prev)
-        @info "smi: $atid from $prev"
+        @debug "smi: $atid from $prev"
         nbs = filter(n-> Chemfiles.type(frame[n]) != "H", adj[atid+1])
         deleteat!(nbs, nbs .== prev)
         nbsmis = ""
@@ -118,10 +120,10 @@ function smiles(frame, mol::Vector{Int})
     end
 
     # find starting atom
-    atid = mol[1] 
-    ind = 1
+    atid = mol[startid] 
+    ind = startid 
     while Chemfiles.type(frame[atid]) == "H"
-        ind += 1
+        ind = ((ind+1)%length(mol)) + 1
         atid = mol[ind]
     end
     _breakloop(atid, -1)
@@ -192,6 +194,25 @@ function mol_dictionary(molecules::Vector{Vector{Int}})
     return at_to_mol
 end
 
+function _score_smiles(smi)
+    score = 0
+    score -= length(collect(eachmatch(r"\)", smi)))*1.1  # i dont like brakets
+    anyloop = match(r"[0-9]", smi)
+    firstloop = match(r"^.[0-9][0-9]*", smi) 
+    if (anyloop !== nothing) 
+        if (firstloop !== nothing)
+            score += 1  # prefer loops at the beginning
+        else 
+            score -= 1
+        end
+    end
+    if firstloop !== nothing
+        score -= parse(Int, firstloop.match[2:end])
+    end
+    return score
+end
+        
+
 """
 Generate dictionary of molecule types
 
@@ -204,8 +225,34 @@ Returns:
 """
 function mol_types(frame::Frame, molecules::Vector{Vector{Int}})
     moltypes = Dict{String, Array{Int}}()
+    attypes = Chemfiles.type.(frame)
+    adj = adjacent(frame)
+    all_possible_smis = Dict{Set{String}, String}()  # Set of all possible SMILES and Identification SMILES
     for (molid, mol) in enumerate(molecules)
-        molname = smiles(frame, mol)    
+        molname = smiles(frame, mol; adj=adj, attypes=attypes)    
+        found = false
+        for set in keys(all_possible_smis)
+            if molname in set
+                molname = all_possible_smis[set]
+                found = true
+                break
+            end
+        end
+        if !found
+            bestscore = -Inf
+            smis = Set{String}([molname])
+            for i in Vector(1:length(mol))[Chemfiles.type.(frame)[mol.+1] .!= "H"] 
+                # generate all possible smiles by iterating over all possible start atoms
+                smi = smiles(frame, mol; startid=i, adj=adj, attypes=attypes)
+                score = _score_smiles(smi)
+                if bestscore < score
+                    bestscore = score
+                    molname = smi
+                end
+                push!(smis, smi)
+            end
+            all_possible_smis[smis] = molname
+        end
         if haskey(moltypes, molname)
             push!(moltypes[molname], molid)
         else

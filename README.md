@@ -24,3 +24,7 @@ this adds the directory as module directory and makes it editable. So a update o
 
 ## Usage
 To be added in the future
+
+# Related publications:
+- https://doi.org/10.1021/acs.jpclett.4c02819
+

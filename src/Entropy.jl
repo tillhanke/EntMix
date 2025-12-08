@@ -167,22 +167,32 @@ Args:
 Kwargs:
 - baselength: String - "Covalent", "VDW", "homo" - base length for the atom broadening factor with homo being 1 for all atoms
 """
-function entropy(frame::Frame, atomcollections::Vector{Vector{Int}}, sigma::Float64; baselength="Covalent", dfunc=slater, natoms=ones(length(atomcollections)))
-    baselength = lowercase(baselength)
-    if startswith(baselength, "cov") 
-        scaled_sigma_collections = [
-            sigma.*covalent_radius.([@view frame[i] for i in atoms]) for atoms in atomcollections
-        ]
-    elseif startswith(baselength, "vdw")
-        scaled_sigma_collections = [
-            sigma.*vdw_radius.([@view frame[i] for i in atoms]) for atoms in atomcollections
-        ]
-    elseif startswith(baselength, "homo")
-        scaled_sigma_collections = [
-            [sigma for i in atoms] for atoms in atomcollections
-        ]
-    else
-        @error "Invalid baselength: $baselength"
+function entropy(
+        frame::Frame, 
+        atomcollections::Vector{Vector{Int}}, 
+        sigma::Float64; 
+        baselength="Covalent", 
+        dfunc=slater, 
+        natoms=ones(length(atomcollections)), 
+        scaled_sigma_collections::Any=nothing
+    )
+    if isnothing(scaled_sigma_collections)
+        baselength = lowercase(baselength)
+        if startswith(baselength, "cov") 
+            scaled_sigma_collections = [
+                sigma.*covalent_radius.([@view frame[i] for i in atoms]) for atoms in atomcollections
+            ]
+        elseif startswith(baselength, "vdw")
+            scaled_sigma_collections = [
+                sigma.*vdw_radius.([@view frame[i] for i in atoms]) for atoms in atomcollections
+            ]
+        elseif startswith(baselength, "homo")
+            scaled_sigma_collections = [
+                [sigma for i in atoms] for atoms in atomcollections
+            ]
+        else
+            @error "Invalid baselength: $baselength"
+        end
     end
     args = (
         atoms_positions_collections = [
@@ -200,17 +210,17 @@ function entropy(frame::Frame, atomcollections::Vector{Vector{Int}}, sigma::Floa
     )
     return integral[1]/prod(lengths(UnitCell(frame)))
 end
-function entropy(atoms::Vector{Vector{SVector{3, Float64}}}, sigmas, dfunc, box::SVector{3, Float64})
-    args = (
-        atoms_positions_collections = atoms,
-        scaled_sigma_collections = sigmas,
-        box = box
-    )
-    integral = hcubature(
-        (r) -> entropy_distribution(r, args...; dfunc=dfunc),
-        SVector{3, Float64}(zeros(3)),
-        box,
-        rtol=1e-2, maxevals=20000, initdiv=7
-    )
-    return integral[1]/prod(box)
-end
+# function entropy(atoms::Vector{Vector{SVector{3, Float64}}}, sigmas, dfunc, box::SVector{3, Float64})
+#     args = (
+#         atoms_positions_collections = atoms,
+#         scaled_sigma_collections = sigmas,
+#         box = box
+#     )
+#     integral = hcubature(
+#         (r) -> entropy_distribution(r, args...; dfunc=dfunc),
+#         SVector{3, Float64}(zeros(3)),
+#         box,
+#         rtol=1e-2, maxevals=20000, initdiv=7
+#     )
+#     return integral[1]/prod(box)
+# end

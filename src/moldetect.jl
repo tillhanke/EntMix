@@ -83,7 +83,6 @@ function smiles(frame, mol::Vector{Int}; startid=1, adj=nothing, attypes=nothing
     function _breakloop(atid, prev)
         nbs = filter(n-> (Chemfiles.type(frame[n]) != "H") && (n !=prev), adj[atid+1])
         visited[atid+1] = true
-        @debug "breakloop: $atid from $prev"
         for nb in nbs
             if visited[nb+1]
                 if ! haskey(loop_label, (atid, nb))
@@ -104,7 +103,6 @@ function smiles(frame, mol::Vector{Int}; startid=1, adj=nothing, attypes=nothing
         end
     end
     function _smi(atid, prev)
-        @debug "smi: $atid from $prev"
         nbs = filter(n-> Chemfiles.type(frame[n]) != "H", adj[atid+1])
         deleteat!(nbs, nbs .== prev)
         nbsmis = ""
@@ -161,6 +159,8 @@ function get_molecules(frame::Frame)
             while !isempty(queue)
                 atom = pop!(queue)
                 push!(mol, atom)
+                @debug "current length(adj): $(length(adj)), atom:$atom"
+                @debug "neighbors: $(adj[atom+1])"
                 for neighbor in adj[atom+1]
                     if !visited[neighbor+1]
                         push!(queue, neighbor)

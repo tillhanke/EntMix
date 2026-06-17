@@ -12,7 +12,7 @@ type_from_name!(frame::Frame, types::Vector{String})
 Assign types based on list of atomtypes
 """
 function type_from_name!(frame::Frame; force=false)
-    if Chemfiles.type(frame[1]) != "" && !force
+    if Chemfiles.type(frame[0]) != "" && !force
         @warn "Atom types already set, doing nothing"
         return
     end

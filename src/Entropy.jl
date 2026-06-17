@@ -32,7 +32,7 @@ function entropy_distribution(
     atomcollections::Vector{Vector{Int}},
     sigma::Float64;
     dfunc=slater,
-    natoms=ones(length(atoms_positions_collections))  # Number of atoms in each molecule 
+    natoms=ones(length(atomcollections))  # Number of atoms in each molecule 
     )
     atoms_positions_collections = [
         [SVector{3, Float64}(positions(frame)[:,i]) for i in atoms.+1] 

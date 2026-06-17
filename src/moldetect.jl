@@ -1,4 +1,4 @@
-using Chemfiles: Frame, UnitCell, positions, covalent_radius, lengths, guess_bonds!, set_type!, name, type
+using Chemfiles: Frame, UnitCell, positions, covalent_radius, lengths, guess_bonds!, set_type!, name, type, mass
 using StaticArrays
 import Chemfiles
 
@@ -21,7 +21,7 @@ function type_from_name!(frame::Frame; force=false)
     end
 end
 
-function type_from_name!(frame::Frame, types::Vector{String})
+function type_from_name!(frame::Frame, types::AbstractVector{<:AbstractString})
     for i in 0:length(frame)-1
         set_type!(view(frame, i), types[i+1])  
     end
@@ -262,3 +262,45 @@ function mol_types(frame::Frame, molecules::Vector{Vector{Int}})
     return moltypes
 end
 
+
+"""
+Calculate Center of Mass for the Molecule
+
+Args:
+- frame: Frame - frame to calculate center of mass from
+- mol: Vector{Int} - list of atom indices in Chemfiles format (starting from 0)
+
+Returns:
+- center_of_mass: SVector{3, Float64} - center of mass of the molecule
+"""
+function center_of_mass(frame::Frame, mol::Vector{Int})
+    pos = positions(frame)
+    com = zeros(SVector{3, Float64})
+    total_mass = 0.0
+    for atom in mol
+        m = mass(frame[atom])
+        com += SVector{3, Float64}(pos[1, atom+1], pos[2, atom+1], pos[3, atom+1]) * m
+        total_mass += m
+    end
+    return com / total_mass
+end 
+
+
+"""
+Calculate geometric center of the Molecule
+
+Args:
+- frame: Frame - frame to calculate geometric center from
+- mol: Vector{Int} - list of atom indices in Chemfiles format (starting from 0)
+
+Returns:
+- geometric_center: SVector{3, Float64} - geometric center of the molecule
+"""
+function geometric_center(frame::Frame, mol::Vector{Int})
+    pos = positions(frame)
+    geom_center = zeros(SVector{3, Float64})
+    for atom in mol
+        geom_center += SVector{3, Float64}(pos[1, atom+1], pos[2, atom+1], pos[3, atom+1])
+    end
+    return geom_center / length(mol)
+end 

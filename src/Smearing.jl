@@ -246,5 +246,31 @@ function constant(r::AbstractVector{<:Real}, r0::AbstractVector{<:Real}, sigma::
     return constant(norm(r .- r0), sigma)
 end
 
+"""
+Cosine density distribution function cos(pi/2 * r/sigma)
+compact support: zero for distances larger than sigma
+normalized in 3D (checked analytically)
+The 1D kernel K(u) = pi/4 * cos(pi/2 * u) reweighted for the 3D radial measure.
+
+Args:
+- r - points in space
+- r0 - atom coordinates
+- sigma: Float64 - atom broadening value (cutoff radius)
+returns:
+- c: Float64 - density at point r for atom at r0
+"""
+function cosine(r:: Float64, sigma:: Float64)
+    dist = abs(r)
+    if dist > sigma
+        return 0.0
+    end
+    norm_const = pi^2/(8*sigma^3*(pi^2 - 8))
+    return norm_const * cos(pi/2 * dist/sigma)
+end
+function cosine(r::AbstractVector{<:Real}, r0::AbstractVector{<:Real}, sigma:: Float64)
+    @assert length(r) == length(r0) == 3 "r and r0 must be dimension 3"
+    return cosine(norm(r .- r0), sigma)
+end
+
 
 

@@ -14,6 +14,7 @@ const wendland = EntMix.wendland
 const gengauss = EntMix.gengauss
 const lorentz = EntMix.lorentz
 const constant = EntMix.constant
+const cosine = EntMix.cosine
 
 """
 Integrate a spherically symmetric kernel f(r, sigma) over all of R^3 via the
@@ -46,6 +47,7 @@ end
             @test radial_norm(cubicspline, sigma; cutoff=2 * sigma) ≈ 1.0 atol = 1e-4
             @test radial_norm(wendland, sigma; cutoff=sigma) ≈ 1.0 atol = 1e-4
             @test radial_norm(constant, sigma; cutoff=sigma) ≈ 1.0 atol = 1e-4
+            @test radial_norm(cosine, sigma; cutoff=sigma) ≈ 1.0 atol = 1e-4
 
             # infinite-support kernels: integrate over the whole half-line
             @test radial_norm(slater, sigma) ≈ 1.0 atol = 1e-3
@@ -64,6 +66,7 @@ end
         @test cubicspline(2 * sigma + 1e-6, sigma) == 0.0
         @test wendland(sigma + 1e-6, sigma) == 0.0
         @test constant(sigma + 1e-6, sigma) == 0.0
+        @test cosine(sigma + 1e-6, sigma) == 0.0
         # constant kernel really is constant inside its support
         @test constant(0.0, sigma) == constant(0.9 * sigma, sigma)
     end
@@ -72,13 +75,15 @@ end
         sigma = 1.0
         rs = range(0.0, 4.0; length=40)
         for f in (slater, gaus, cauchy, linear, epanechnikov,
-                  cubicspline, wendland, gengauss, lorentz, constant)
+                  cubicspline, wendland, gengauss, lorentz, constant, cosine)
             @test all(f(r, sigma) >= 0 for r in rs)
         end
         # smooth bell-shaped kernels should be maximal at the centre
         for f in (gaus, cauchy, epanechnikov, cubicspline, wendland, gengauss, lorentz, constant)
             @test f(0.0, sigma) >= f(0.5, sigma) >= f(1.0, sigma)
         end
+        # cosine decreases monotonically to zero at its cutoff
+        @test cosine(0.0, sigma) >= cosine(0.5, sigma) >= cosine(1.0, sigma)
     end
 
     @testset "scalar and vector forms agree" begin
@@ -87,7 +92,8 @@ end
         for (fvec, fscal) in ((slater, slater), (gaus, gaus), (cauchy, cauchy),
                               (epanechnikov, epanechnikov), (cubicspline, cubicspline),
                               (wendland, wendland), (gengauss, gengauss),
-                              (lorentz, lorentz), (constant, constant))
+                              (lorentz, lorentz), (constant, constant),
+                              (cosine, cosine))
             for d in (0.0, 0.7, 1.5, 3.0)
                 r = r0 .+ [d, 0.0, 0.0]
                 @test fvec(r, r0, sigma) ≈ fscal(d, sigma)
@@ -102,6 +108,7 @@ end
         @test_throws AssertionError slater([1.0, 0.0], [0.0, 0.0], 1.0)
         @test_throws AssertionError gengauss([1.0, 0.0], [0.0, 0.0], 1.0)
         @test_throws AssertionError cauchy([1.0], [0.0], 1.0)
+        @test_throws AssertionError cosine([1.0, 0.0], [0.0, 0.0], 1.0)
         # linear asserts a non-negative distance
         @test_throws AssertionError linear(-1.0, 1.0)
     end

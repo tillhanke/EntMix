@@ -52,27 +52,51 @@ function entropy_distribution(
     dfunc=slater,
     natoms=ones(length(atoms_positions_collections))  # Number of atoms in each molecule 
 )
-    density_collections = zeros(length(atoms_positions_collections))
+    # density_collections = zeros(length(atoms_positions_collections))
+    # total_density = 0.0
+    # For speedup one can rewrite the S = -sum_i d_i/sum_i(d_i) log(d_i/sum_i(d_i)):
+    #   D = sum_i d_i
+    # => S = -1/D sum_i d_i log(d_i/D) = -1/D sum_i d_i (log(d_i) - log(D))
+    #      = log(D) - 1/D sum_i d_i log(d_i)
+    # This means, we only have to calculate d_i*log(d_i) sum for the molecules i
+    D = 0.0  # sum of densities
+    di_logdi = 0.0  # sum of d_i * log(d_i)
     for i in 1:length(atoms_positions_collections)
-        density_collections[i] = dens(
+        d_i = dens(
             r, 
             atoms_positions_collections[i], 
             scaled_sigma_collections[i], 
             box; 
             dfunc=dfunc
-           )/natoms[i]
-    end
-    total_density = sum(density_collections)
-    if total_density == 0
-        return 0
-    end
-    s = 0
-    for d in density_collections
-        if d != 0
-            s -= d/total_density * log(d/total_density)
+        )/natoms[i]
+        if d_i > 0
+            di_logdi += d_i*log(d_i)
+            D += d_i
         end
+
+        # density_collections[i] = dens(
+        #     r, 
+        #     atoms_positions_collections[i], 
+        #     scaled_sigma_collections[i], 
+        #     box; 
+        #     dfunc=dfunc
+        #    )/natoms[i]
     end
-    return s
+    # total_density = sum(density_collections)
+    # if total_density == 0
+    #     return 0.0
+    # end
+    if D == 0
+        return 0.0
+    end
+    return log(D) - 1/D * di_logdi
+    # s = 0.0
+    # for d in density_collections
+    #     if d != 0
+    #         s -= d/total_density * log(d/total_density)
+    #     end
+    # end
+    # return s
 end
 
 """
@@ -152,6 +176,7 @@ returns:
 - d: Float64 - density distribution at point r
 """
 function dens(r::AbstractVector{<:Real}, frame::Frame, atoms::Vector{Int}, sigma::Float64; dfunc=slater)
+    @info "This method is always using covalent radii to scale sigma values"
     atom_positions = [SVector{3, Float64}(positions(frame)[:,i]) for i in atoms.+1] 
     scaled_sigma = sigma.*covalent_radius.([@view frame[i] for i in atoms])
     return dens(r, atom_positions, scaled_sigma, SVector{3}(lengths(UnitCell(frame))); dfunc=dfunc)
@@ -164,10 +189,16 @@ function dens(
     dfunc=slater
 )
     d = 0.0
-    dist = zeros(3)
+    # dist = zeros(3)
     for index in eachindex(scaled_sigma)
-        pbc_distance!(r, atom_positions[index], box, dist)
-        d += dfunc(norm(dist), scaled_sigma[index])
+        # pbc_distance!(r, atom_positions[index], box, dist)
+        p = atom_positions[index]
+        dr_pbc = 0.0
+        for ind in 1:3
+            dr_pbc += (mod((r[ind] - p[ind] + box[ind]/2) , box[ind]) - box[ind]/2)^2
+        end
+        # d += dfunc(norm(dist), scaled_sigma[index])
+        d += dfunc(sqrt(dr_pbc), scaled_sigma[index])
     end
     return d
 end
@@ -210,23 +241,24 @@ function entropy(
             @error "Invalid baselength: $baselength"
         end
     end
+    ucel_lengths = lengths(UnitCell(frame))
     args = (
         atoms_positions_collections = [
             [SVector{3, Float64}(positions(frame)[:,i]) for i in atoms.+1] 
             for atoms in atomcollections
         ],
         scaled_sigma_collections = scaled_sigma_collections,
-        box = SVector{3}(lengths(UnitCell(frame)))
+        box = SVector{3}(ucel_lengths)
     )
     @debug "types of args:"
     @debug [typeof(argi) for argi in args]
     integral = hcubature(
         (r) -> entropy_distribution(r, args...; dfunc=dfunc, natoms),
         SVector{3, Float64}(zeros(3)),
-        lengths(UnitCell(frame)),
-        rtol=1e-2, maxevals=20000, initdiv=7
+        ucel_lengths,
+        rtol=1e-5, maxevals=Int64(5e5), initdiv=7
     )
-    return integral[1]/prod(lengths(UnitCell(frame)))
+    return integral[1]/prod(ucel_lengths)
 end
 # function entropy(atoms::Vector{Vector{SVector{3, Float64}}}, sigmas, dfunc, box::SVector{3, Float64})
 #     args = (

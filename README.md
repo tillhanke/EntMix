@@ -25,6 +25,11 @@ this adds the directory as module directory and makes it editable. So a update o
 ## Usage
 To be added in the future
 
+### Run Tests:
+```bash 
+julia --project=./ -e "using Pkg;Pkg.test()"
+```
+
 # Related publications:
 - https://doi.org/10.1021/acs.jpclett.4c02819
 - https://doi.org/10.1063/5.0304658

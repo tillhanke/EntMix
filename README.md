@@ -23,7 +23,7 @@ dev "./EntMix"
 this adds the directory as module directory and makes it editable. So a update of the module can be done by simply pulling the repository.
 
 ## Usage
-To be added in the future
+The simplest way to use the functionality of this package is to make use of the `calc_entropy.jl` script in the [EntMixScripts](https://github.com/tillhanke/EntMixScripts/tree/master/src) repository.
 
 ### Run Tests:
 ```bash 

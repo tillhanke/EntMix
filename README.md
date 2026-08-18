@@ -6,7 +6,7 @@ Currently only binary mixtures are supported.
 
 ## Installation
 ### Install Julia
-It is recommendet to use Juliaup to install julia and fix the default version to 1.10.9 (which is the version, the module was developed with).
+It is recommendet to use Juliaup to install julia and fix the default version to 1.12.5 (which is the version, the module was developed with).
 
 Juliaup can be found [here](https://github.com/JuliaLang/juliaup)
 

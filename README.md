@@ -27,4 +27,5 @@ To be added in the future
 
 # Related publications:
 - https://doi.org/10.1021/acs.jpclett.4c02819
+- https://doi.org/10.1063/5.0304658
 
